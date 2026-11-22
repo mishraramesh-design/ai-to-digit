@@ -5,8 +5,10 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+from urllib.error import URLError
 
 from digit_harness.server import Handler
+from digit_harness.sandbox import prepare_sandbox
 from digit_harness.workflow import knowledge, run
 
 
@@ -63,7 +65,7 @@ class WorkbenchTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             status, page = request(folder, "GET", "/")
             self.assertEqual(status, 200)
-            self.assertIn(b"DIGIT Engineering Workbench", page)
+            self.assertIn(b"DIGIT Development Studio", page)
             payload = json.dumps({
                 "requirement": "Add missed pickups",
                 "kind": "complaint-subtype",
@@ -78,3 +80,23 @@ class WorkbenchTest(unittest.TestCase):
             self.assertEqual(json.loads(saved), document)
             status, _ = request(folder, "GET", "/", origin="https://example.org")
             self.assertEqual(status, 403)
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_sandbox_unconfigured(self):
+        self.assertEqual(prepare_sandbox()["status"], "unconfigured")
+
+    @patch.dict("os.environ", {
+        "HARNESS_DIGIT_TENANT": "pg.citya",
+        "HARNESS_DIGIT_PGR_URL": "http://pgr-services:8080",
+        "HARNESS_DIGIT_MDMS_URL": "http://mdms-backend:8094",
+    })
+    @patch("digit_harness.sandbox.read_document")
+    def test_sandbox_reads_live_contract_and_reports_unreachable_service(self, read):
+        hierarchy = {"MdmsRes": {"RAINMAKER-PGR": {
+            "ComplaintHierarchyDefinition": [{"hierarchyType": "complaints"}],
+            "ComplaintHierarchy": [{"hierarchyType": "complaints", "code": "Waste"}],
+        }}}
+        read.side_effect = [{"status": "UP"}, hierarchy, URLError("unreachable"), hierarchy]
+        self.assertEqual(prepare_sandbox()["status"], "readable")
+        self.assertEqual(read.call_args.args[2]["MdmsCriteria"]["tenantId"], "pg.citya")
+        self.assertEqual(prepare_sandbox()["status"], "blocked")

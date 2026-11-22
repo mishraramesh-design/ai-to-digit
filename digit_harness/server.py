@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
+from .sandbox import prepare_sandbox
 from .workflow import knowledge, render, run
 
 
@@ -44,6 +45,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/knowledge":
             self.send(200, render(knowledge()))
+            return
+        if path == "/api/sandbox":
+            self.send(200, render(prepare_sandbox()))
             return
         if path.startswith("/api/runs/"):
             try:

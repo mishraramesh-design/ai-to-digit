@@ -2,6 +2,12 @@
 
 The local prototype takes a structured PGR complaint subtype request through FRS and SRS drafts, evidence-backed routing, a configuration diff, a citizen selector preview and acceptance checks.
 
+## Prepare a DIGIT sandbox
+
+The **Prepare sandbox** action performs read-only checks against a separately deployed PGR v2.20 sandbox. Set `HARNESS_DIGIT_TENANT`, `HARNESS_DIGIT_PGR_URL`, and `HARNESS_DIGIT_MDMS_URL` on the Studio service. Use the seeded city tenant and the PGR and MDMS service addresses reachable inside the private Docker network. Attach Studio to that network before using internal Docker service names.
+
+The probe checks PGR health and looks up the tenant's complaint hierarchy. A readable status covers these two checks. Employee sign-in and changes to live DIGIT are separate integration milestones. The change preview uses the sample catalog.
+
 ## Run locally
 
 From the repository root with Python 3.11 or newer:
@@ -10,7 +16,7 @@ From the repository root with Python 3.11 or newer:
 python -m digit_harness.server
 ```
 
-Open [the local workbench](http://127.0.0.1:8090/) and select **Run workflow** for the supplied missed garbage pickup example. The run record can be downloaded and is stored under `.local/runs`, which Git ignores.
+Open [the local workbench](http://127.0.0.1:8090/) and select **Preview change** for the supplied missed garbage pickup example. The run record can be downloaded and is stored under `.local/runs`, which Git ignores.
 
 ```powershell
 python -m unittest discover -s tests -v

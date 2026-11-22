@@ -5,6 +5,10 @@ services:
       - "127.0.0.1:8090:8090"
     volumes:
       - runs:/data/runs
+    environment:
+      HARNESS_DIGIT_TENANT: ${HARNESS_DIGIT_TENANT:-}
+      HARNESS_DIGIT_PGR_URL: ${HARNESS_DIGIT_PGR_URL:-}
+      HARNESS_DIGIT_MDMS_URL: ${HARNESS_DIGIT_MDMS_URL:-}
     restart: unless-stopped
 volumes:
   runs:

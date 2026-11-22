@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DIGIT Engineering Workbench</title>
+  <title>DIGIT Development Studio</title>
   <style>
     :root { color-scheme: light; font-family: "Segoe UI", system-ui, sans-serif; color: #162a32; background: #edf3f2; }
     body { margin: 0; }
@@ -22,17 +22,40 @@
     summary { cursor: pointer; font-weight: 600; }
     pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f0f6f4; padding: .7rem; border-radius: .35rem; }
     #status { color: #834324; }
+    .sandbox { max-width: 1158px; margin: 1.7rem auto 0; }
+    .sandbox-wrap { padding: 0 1.2rem; }
+    .sandbox-head { display: flex; gap: 1rem; align-items: start; justify-content: space-between; flex-wrap: wrap; }
+    .sandbox-head h2 { margin: 0; }
+    .sandbox-head p { margin: .35rem 0 0; }
+    .sandbox-head button { margin-top: 0; }
+    #sandbox-status:empty, #sandbox-checks:empty { display: none; }
+    #sandbox-checks { padding-left: 1.25rem; }
+    .mode { color: #495f65; }
     @media (max-width: 750px) { main { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <header>
-    <h1>DIGIT Engineering Workbench</h1>
-    <p>Local PGR fixture · DIGIT 2.9 LTS target</p>
+    <h1>DIGIT Development Studio</h1>
+    <p>Prepare a sandbox and review a proposed configuration change.</p>
   </header>
+  <div class="sandbox-wrap">
+    <section class="sandbox" aria-labelledby="sandbox-heading">
+      <div class="sandbox-head">
+        <div>
+          <h2 id="sandbox-heading">DIGIT sandbox</h2>
+          <p class="mode">PGR v2.20 · Read-only connection check</p>
+        </div>
+        <button id="prepare" type="button">Prepare sandbox</button>
+      </div>
+      <p id="sandbox-status" role="status"></p>
+      <ul id="sandbox-checks"></ul>
+    </section>
+  </div>
   <main>
     <section>
-      <h2>Change request</h2>
+      <h2>Draft a configuration change</h2>
+      <p class="mode">Practice mode · Changes apply to the sample complaint catalog.</p>
       <form id="request">
         <label for="requirement">Requirement</label>
         <textarea id="requirement" name="requirement" maxlength="8000" required>Add a missed garbage pickup option to the citizen complaint form.</textarea>
@@ -49,13 +72,13 @@
           <input id="label" name="label" value="Missed garbage pickup" maxlength="100">
         </div>
         <label><input type="checkbox" name="model_review"> Send requirement to the configured Langflow flow for review</label>
-        <button>Run workflow</button>
+        <button>Preview change</button>
       </form>
       <p id="status" role="status"></p>
     </section>
     <section>
       <h2>Run evidence</h2>
-      <p id="intro">Run a request to review the decision, specification and preview.</p>
+      <p id="intro">Preview a change to see its decision, specifications, diff and acceptance checks.</p>
       <div id="result" hidden>
         <h3 id="decision"></h3>
         <p id="reason"></p>
@@ -84,6 +107,30 @@
       list.append(item);
       return item;
     };
+    const prepare = get("prepare");
+    prepare.addEventListener("click", async () => {
+      const status = get("sandbox-status");
+      const checks = get("sandbox-checks");
+      prepare.disabled = true;
+      checks.replaceChildren();
+      status.textContent = "Checking PGR and master data…";
+      try {
+        const response = await fetch("/api/sandbox");
+        if (!response.ok) throw new Error("Sandbox check could not run.");
+        const report = await response.json();
+        status.textContent = report.message || (
+          (report.tenant ? report.tenant + " · " : "") +
+          (report.status === "readable" ? "PGR and complaint hierarchy are readable." : "Sandbox checks need attention.")
+        );
+        for (const check of report.checks) {
+          addItem(checks, check.name + " · " + check.detail);
+        }
+      } catch (error) {
+        status.textContent = error.message;
+      } finally {
+        prepare.disabled = false;
+      }
+    });
     get("kind").addEventListener("change", () => {
       get("configuration").hidden = get("kind").value !== "complaint-subtype";
     });

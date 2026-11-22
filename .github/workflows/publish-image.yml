@@ -42,6 +42,9 @@ jobs:
                       raise
                   time.sleep(1)
 
+          with urlopen(base + "/api/sandbox", timeout=3) as response:
+              assert json.load(response)["status"] == "unconfigured"
+
           payload = {
               "requirement": "Add missed pickups",
               "kind": "complaint-subtype",
