@@ -22,13 +22,43 @@ jobs:
           set -euo pipefail
           [[ "$IMAGE" =~ ^[a-z0-9_-]+/[a-z0-9._-]+$ ]]
           docker build -t "$IMAGE:$GITHUB_SHA" .
-          docker run --rm --detach --name workbench -p 127.0.0.1:8090:8090 "$IMAGE:$GITHUB_SHA"
-          trap 'docker logs workbench; docker stop workbench' EXIT
-          curl --retry 10 --retry-connrefused --fail --silent http://127.0.0.1:8090/api/knowledge > /dev/null
-          curl --fail --silent http://127.0.0.1:8090/api/runs \
-            -H 'Content-Type: application/json' \
-            -d '{"requirement":"Add missed pickups","kind":"complaint-subtype","code":"MISSED_PICKUP","label":"Missed pickup"}' |
-            python -c 'import json, sys; from uuid import UUID; run = json.load(sys.stdin); UUID(run["run_id"]); assert run["decision"]["path"] == "configure" and len(run["tests"]) == 3 and all(t["pass"] for t in run["tests"])'
+          docker run --detach --name workbench "$IMAGE:$GITHUB_SHA"
+          trap 'docker logs workbench; docker rm -f workbench' EXIT
+          docker exec -i workbench python - <<'PY'
+          import json
+          import time
+          from urllib.error import URLError
+          from urllib.request import Request, urlopen
+          from uuid import UUID
+
+          base = "http://127.0.0.1:8090"
+          for attempt in range(10):
+              try:
+                  with urlopen(base + "/api/knowledge", timeout=3) as response:
+                      assert json.load(response)["catalog"]
+                  break
+              except URLError:
+                  if attempt == 9:
+                      raise
+                  time.sleep(1)
+
+          payload = {
+              "requirement": "Add missed pickups",
+              "kind": "complaint-subtype",
+              "code": "MISSED_PICKUP",
+              "label": "Missed pickup",
+          }
+          request = Request(base + "/api/runs", data=json.dumps(payload).encode(),
+                            headers={"Content-Type": "application/json"})
+          with urlopen(request, timeout=3) as response:
+              assert response.status == 201
+              run = json.load(response)
+          assert run["decision"]["path"] == "configure"
+          assert len(run["tests"]) == 3 and all(test["pass"] for test in run["tests"])
+          run_id = UUID(run["run_id"])
+          with urlopen(f"{base}/api/runs/{run_id}", timeout=3) as response:
+              assert json.load(response) == run
+          PY
       - uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
