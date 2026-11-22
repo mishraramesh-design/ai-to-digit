@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DIGIT Engineering Workbench</title>
+  <style>
+    :root { color-scheme: light; font-family: "Segoe UI", system-ui, sans-serif; color: #162a32; background: #edf3f2; }
+    body { margin: 0; }
+    header { background: #102e34; color: #fff; padding: 2rem max(5vw, 1.2rem); }
+    header p { color: #badbd5; margin-bottom: 0; }
+    h1 { margin: 0; font-size: clamp(1.7rem, 4vw, 2.7rem); }
+    h2 { margin-top: 0; }
+    main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); gap: 1.2rem; max-width: 1200px; margin: 1.7rem auto; padding: 0 1.2rem; align-items: start; }
+    section { background: #fff; padding: 1.4rem; border: 1px solid #cfddda; border-radius: .7rem; }
+    label { display: block; font-weight: 600; margin: .8rem 0 .3rem; }
+    input:not([type=checkbox]), textarea, select { box-sizing: border-box; width: 100%; padding: .65rem; border: 1px solid #819b98; border-radius: .35rem; font: inherit; background: #fff; color: inherit; }
+    textarea { min-height: 7rem; resize: vertical; }
+    button, .download { display: inline-block; margin-top: 1rem; padding: .65rem 1rem; border: 0; background: #075c51; color: #fff; border-radius: .35rem; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
+    button:disabled { opacity: .55; cursor: wait; }
+    details { padding: .6rem 0; border-top: 1px solid #d9e5e2; }
+    summary { cursor: pointer; font-weight: 600; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f0f6f4; padding: .7rem; border-radius: .35rem; }
+    #status { color: #834324; }
+    @media (max-width: 750px) { main { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>DIGIT Engineering Workbench</h1>
+    <p>Local PGR fixture · DIGIT 2.9 LTS target</p>
+  </header>
+  <main>
+    <section>
+      <h2>Change request</h2>
+      <form id="request">
+        <label for="requirement">Requirement</label>
+        <textarea id="requirement" name="requirement" maxlength="8000" required>Add a missed garbage pickup option to the citizen complaint form.</textarea>
+        <label for="kind">Request type</label>
+        <select id="kind" name="kind">
+          <option value="complaint-subtype">Complaint subtype</option>
+          <option value="extension">Existing module extension</option>
+          <option value="new-module">New module</option>
+        </select>
+        <div id="configuration">
+          <label for="code">Subtype code</label>
+          <input id="code" name="code" value="MISSED_GARBAGE_PICKUP" maxlength="48">
+          <label for="label">English label</label>
+          <input id="label" name="label" value="Missed garbage pickup" maxlength="100">
+        </div>
+        <label><input type="checkbox" name="model_review"> Send requirement to the configured Langflow flow for review</label>
+        <button>Run workflow</button>
+      </form>
+      <p id="status" role="status"></p>
+    </section>
+    <section>
+      <h2>Run evidence</h2>
+      <p id="intro">Run a request to review the decision, specification and preview.</p>
+      <div id="result" hidden>
+        <h3 id="decision"></h3>
+        <p id="reason"></p>
+        <div id="preview" hidden>
+          <label for="complaint">Citizen complaint selector · preview</label>
+          <select id="complaint"></select>
+        </div>
+        <h3>Acceptance checks</h3>
+        <ul id="tests"></ul>
+        <details><summary>Functional requirements</summary><pre id="frs"></pre></details>
+        <details><summary>Software requirements</summary><pre id="srs"></pre></details>
+        <details><summary>Configuration diff</summary><pre id="diff"></pre></details>
+        <details><summary>Source evidence</summary><ul id="evidence"></ul></details>
+        <details><summary>Model review</summary><pre id="advice"></pre></details>
+        <a id="download" class="download" download>Download run record</a>
+      </div>
+    </section>
+  </main>
+  <script>
+    const get = id => document.getElementById(id);
+    const form = get("request");
+    const button = form.querySelector("button");
+    const addItem = (list, text) => {
+      const item = document.createElement("li");
+      item.textContent = text;
+      list.append(item);
+      return item;
+    };
+    get("kind").addEventListener("change", () => {
+      get("configuration").hidden = get("kind").value !== "complaint-subtype";
+    });
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      button.disabled = true;
+      get("result").hidden = true;
+      get("intro").hidden = false;
+      get("status").textContent = "Running workflow…";
+      try {
+        const payload = Object.fromEntries(new FormData(form));
+        payload.model_review = form.elements.model_review.checked;
+        const response = await fetch("/api/runs", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error);
+        get("decision").textContent = data.decision.path + " · " + data.decision.rule;
+        get("reason").textContent = data.decision.reason;
+        for (const id of ["frs", "srs", "diff"]) get(id).textContent = data[id] || "No configuration changes.";
+        get("advice").textContent = data.model_review.advice || data.model_review.detail || data.model_review.status;
+        get("preview").hidden = !data.preview_catalog;
+        get("complaint").replaceChildren();
+        for (const entry of data.preview_catalog || []) {
+          get("complaint").add(new Option(entry.labels.en_IN, entry.code));
+        }
+        get("tests").replaceChildren();
+        for (const test of data.tests) {
+          addItem(get("tests"), test.id + " · " + test.criterion + " · " + (test.pass ? "Pass" : "Fail"));
+        }
+        if (!data.tests.length) addItem(get("tests"), "Awaiting implementation review.");
+        get("evidence").replaceChildren();
+        for (const reference of data.evidence) {
+          const item = addItem(get("evidence"), reference.id + " · " + reference.claim + " ");
+          if (reference.source.startsWith("https://")) {
+            const link = document.createElement("a");
+            link.href = reference.source;
+            link.textContent = "Source";
+            item.append(link);
+          }
+        }
+        get("download").href = "/api/runs/" + data.run_id;
+        get("download").download = data.run_id + ".json";
+        get("intro").hidden = true;
+        get("result").hidden = false;
+        get("status").textContent = "Run saved.";
+      } catch (error) {
+        get("status").textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

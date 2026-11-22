@@ -1,0 +1,30 @@
+{
+  "baseline": "DIGIT 2.9 LTS target / local PGR fixture",
+  "evidence": [
+    {
+      "id": "DIGIT-LTS",
+      "kind": "upstream-documentation",
+      "source": "https://docs.digit.org/platform/community/digit-lts-terms-of-service",
+      "claim": "Target upstream release family is DIGIT 2.9 LTS."
+    },
+    {
+      "id": "PGR-SCOPE",
+      "kind": "upstream-documentation",
+      "source": "https://docs.digit.org/local-governance/v2.8/products/modules/public-grievances-and-redressal/pgr-functional-specifications",
+      "claim": "PGR supports complaint submission, assignment, resolution and tracking. This reference describes v2.8."
+    },
+    {
+      "id": "FIXTURE-CATALOG",
+      "kind": "local-fixture",
+      "source": "digit_harness/knowledge.json#catalog",
+      "claim": "The local preview accepts complaint subtype records with code, department and an English label."
+    }
+  ],
+  "catalog": [
+    {
+      "code": "STREET_SWEEPING",
+      "department": "SANITATION",
+      "labels": {"en_IN": "Street sweeping"}
+    }
+  ]
+}

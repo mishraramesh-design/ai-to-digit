@@ -1,0 +1,10 @@
+services:
+  workbench:
+    image: ${WORKBENCH_IMAGE:?Set WORKBENCH_IMAGE to a published Docker Hub image and tag}
+    ports:
+      - "127.0.0.1:8090:8090"
+    volumes:
+      - runs:/data/runs
+    restart: unless-stopped
+volumes:
+  runs:

@@ -1,0 +1,5 @@
+**
+!Dockerfile
+!digit_harness/
+!digit_harness/**
+**/__pycache__/
